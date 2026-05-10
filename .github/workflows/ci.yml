@@ -54,7 +54,11 @@ jobs:
         run: dotnet build --no-restore --configuration Release
 
       - name: Test
-        run: dotnet test --no-build --configuration Release --logger "trx;LogFileName=test-results.trx"
+        run: >-
+          dotnet test --no-build --configuration Release
+          --logger "trx;LogFileName=test-results.trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory ${{ github.workspace }}/TestResults
 
       - name: Upload test results
         if: always()
@@ -63,3 +67,17 @@ jobs:
           name: test-results-${{ matrix.os }}
           path: '**/TestResults/*.trx'
           if-no-files-found: ignore
+
+      # Codecov upload. Reacts to coverage reports — without this step the
+      # Codecov pipeline never starts, regardless of whether CODECOV_TOKEN
+      # is set in the repo. Each matrix leg uploads under a distinct flag so
+      # per-OS coverage is visible; Codecov merges them at the project level.
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: ${{ github.workspace }}/TestResults
+          flags: ${{ matrix.os }}
+          name: ${{ matrix.os }}
+          fail_ci_if_error: false

@@ -7,10 +7,12 @@
   Enforces the trunk-based + release-branch workflow documented in
   docs/BRANCHING.md:
 
-    - Stable versions (e.g. 0.2.0) MUST be cut from a `release/v*` branch.
-    - Prereleases (e.g. 0.2.0-rc.1) may be cut from `master`, a `release/v*`,
-      or any `feature/*` / `fix/*` / `perf/*` / `chore/*` / `ci/*` / `docs/*`
-      branch.
+    - Stable versions (e.g. 0.1.0, 0.1.1) MUST be cut from the matching
+      `release/MAJOR.MINOR.x` branch — one branch per minor line that hosts
+      every patch in that line.
+    - Prereleases (e.g. 0.2.0-rc.1) may be cut from `master`, any
+      `release/MAJOR.MINOR.x`, or any `feature/*` / `fix/*` / `perf/*` /
+      `chore/*` / `ci/*` / `docs/*` branch.
 
   Steps: branch check, clean-tree check, tag pre-check, `dotnet test`,
   in-place <Version> rewrite, commit, annotated tag, push current branch +
@@ -31,7 +33,8 @@
 
 .EXAMPLE
   ./scripts/release.ps1 -Version 0.3.0-alpha.1
-  ./scripts/release.ps1 -Version 0.2.0          # must be on release/v0.2
+  ./scripts/release.ps1 -Version 0.1.0          # must be on release/0.1.x
+  ./scripts/release.ps1 -Version 0.1.1          # also on release/0.1.x
 #>
 [CmdletBinding()]
 param(
@@ -70,18 +73,23 @@ Push-Location $repoRoot
 try {
     Step "Verifying current branch matches version policy"
     $branch = (git rev-parse --abbrev-ref HEAD).Trim()
+    $versionMajorMinor = ($Version -split '[-+]')[0] -replace '^(\d+\.\d+)\..*$', '$1'
+    $expectedReleaseBranch = "release/$versionMajorMinor.x"
+    $releaseBranchPattern = '^release/\d+\.\d+\.x$'
+
     if ($isPrerelease) {
-        $allowedPrefixes = @('master', 'release/v', 'feature/', 'fix/', 'perf/', 'chore/', 'ci/', 'docs/')
-        $isAllowed = $false
-        foreach ($prefix in $allowedPrefixes) {
-            if ($branch -eq $prefix -or $branch.StartsWith($prefix)) { $isAllowed = $true; break }
-        }
+        $isAllowed = $branch -eq 'master' `
+            -or $branch -match $releaseBranchPattern `
+            -or $branch -match '^(feature|fix|perf|chore|ci|docs)/'
         if (-not $isAllowed) {
-            throw "Prerelease '$Version' must be cut from master, release/v*, or a work branch (feature/*, fix/*, perf/*, chore/*, ci/*, docs/*); current branch is '$branch'."
+            throw "Prerelease '$Version' must be cut from master, release/MAJOR.MINOR.x, or a work branch (feature/*, fix/*, perf/*, chore/*, ci/*, docs/*); current branch is '$branch'."
         }
     } else {
-        if (-not $branch.StartsWith('release/v')) {
-            throw "Stable version '$Version' must be cut from a 'release/v*' branch (got '$branch'). See docs/BRANCHING.md."
+        if ($branch -notmatch $releaseBranchPattern) {
+            throw "Stable version '$Version' must be cut from a 'release/MAJOR.MINOR.x' branch (got '$branch'). See docs/BRANCHING.md."
+        }
+        if ($branch -ne $expectedReleaseBranch) {
+            throw "Stable version '$Version' belongs on '$expectedReleaseBranch'; current branch is '$branch'."
         }
     }
 
@@ -129,7 +137,7 @@ try {
     Invoke-Native -File 'git' -Args @('push', $Remote, $branch)
     Invoke-Native -File 'git' -Args @('push', $Remote, $tag)
 
-    if (-not $NoPr -and $branch.StartsWith('release/v')) {
+    if (-not $NoPr -and $branch -match $releaseBranchPattern) {
         $gh = Get-Command gh -ErrorAction SilentlyContinue
         if ($null -ne $gh) {
             Step "Opening backmerge PR ($branch -> master)"

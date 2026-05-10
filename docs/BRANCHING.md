@@ -31,18 +31,26 @@ Short-lived work branches.
 - Open a PR into `master`. CI gates: `ci.yml`, `dependency-review.yml`,
   `codeql.yml`. PR is squashed (or rebase-merged) on green.
 
-### `release/v<MAJOR>.<MINOR>`
+### `release/<MAJOR>.<MINOR>.x`
 
-Stabilisation branches for a stable version.
+Long-lived stabilisation branches — **one per minor line**, hosting every
+patch in that line.
 
-- Created from `master` when we are ready to start hardening for a stable
-  tag. Naming examples: `release/v0.2`, `release/v1.0`.
+- Created from `master` when we are ready to start hardening a minor.
+  Naming examples: `release/0.1.x`, `release/1.0.x`. The literal `.x` makes
+  the role obvious: this is the branch for every patch on the `0.1` line,
+  not for a single tag.
+- **One branch per minor line** — `release/0.1.x` carries `v0.1.0`, then
+  `v0.1.1`, then `v0.1.2`, etc. There is no `release/0.1.0` or
+  `release/0.1.1`. The release script rejects a stable bump whose
+  `MAJOR.MINOR` does not match the branch name.
 - Only fixes flow into a release branch — bug fixes, documentation, build
   fixes, dependency bumps. **No new features.**
-- Stable tags (`v0.2.0`, `v1.0.0`) are cut **only from a `release/v*` branch**.
-  The release scripts enforce this.
-- After the tag is pushed, a PR is opened from the release branch back into
-  `master`. Once merged, the branch may be deleted.
+- Stable tags (`v0.1.0`, `v0.1.1`, `v1.0.0`, ...) are cut **only from the
+  matching `release/MAJOR.MINOR.x` branch**.
+- After every tag is pushed, a PR is opened from the release branch back
+  into `master`. The branch is **kept alive** for future patches on the
+  same minor line — do not delete it until the line is end-of-life.
 
 ## Versioning
 
@@ -51,24 +59,29 @@ Stabilisation branches for a stable version.
 | Where | What can be tagged |
 |---|---|
 | `master` | `vMAJOR.MINOR.PATCH-alpha.N`, `-beta.N`, `-rc.N` |
-| `release/vMAJOR.MINOR` | `vMAJOR.MINOR.PATCH` (stable), `-rc.N` (release candidates) |
+| `release/MAJOR.MINOR.x` | `vMAJOR.MINOR.PATCH` (stable), `-rc.N` (release candidates) — only versions whose `MAJOR.MINOR` matches the branch |
 
 Cutting a stable tag from `master` (or any feature branch) is a release-script
-error. Cutting a prerelease tag from a release branch is allowed — that is
-how `-rc.N` candidates are produced.
+error. Cutting `0.2.0` from `release/0.1.x` is also a release-script error
+— the script verifies the requested `MAJOR.MINOR` matches the branch.
+Cutting a prerelease tag from a release branch is allowed; that is how
+`-rc.N` candidates for the next patch are produced.
 
 ## Release flow
 
 1. **Pick a version.** Decide whether it is a prerelease (continue from
    master) or a stable (cut a release branch).
-2. **Stable cut:**
-   - `git switch -c release/v0.2 master`
-   - `git push -u origin release/v0.2`
+2. **Stable cut (only when the minor line is new):**
+   - `git switch -c release/0.2.x master`
+   - `git push -u origin release/0.2.x`
+   - If the line already exists (e.g. cutting `0.1.1` after `0.1.0`),
+     skip this step and `git switch release/0.1.x` instead.
 3. **Stabilise.** Land fixes via PRs targeting the release branch. CI gates
    apply.
 4. **Tag.** Run `scripts/release.sh 0.2.0` (or `release.ps1`) on the release
    branch. The script:
-   - Validates the branch matches the rule (release branch ⇄ stable version).
+   - Validates the branch matches the rule (release branch ⇄ stable
+     version, AND `MAJOR.MINOR` of the version matches the branch name).
    - Runs the test suite.
    - Bumps `<Version>` in `Directory.Build.props`, commits, tags `v0.2.0`,
      pushes both.
@@ -76,7 +89,8 @@ how `-rc.N` candidates are produced.
      is available); otherwise prints the manual `gh pr create` command.
 5. **Backmerge.** Merge the release-branch PR into `master`. The
    `chore: bump version to …` commit and any release-only fixes flow back to
-   trunk.
+   trunk. **Keep the release branch alive** — the next patch on the same
+   minor (e.g. `0.2.1`) will be cut from it.
 6. **Publish.** The tag push triggers `publish.yml`, which runs the AOT
    gate, packs, and pushes to NuGet.org.
 
@@ -84,10 +98,12 @@ how `-rc.N` candidates are produced.
 
 A hotfix on a shipped stable line is just a release-branch operation:
 
-1. `git switch release/v0.2`
-2. Land the fix via PR.
+1. `git switch release/0.2.x`
+2. Land the fix via PR (target the release branch, not `master`).
 3. Run `scripts/release.sh 0.2.1`.
 4. Backmerge to `master`.
 
-If the affected release branch was deleted, recreate it from the most recent
-matching tag (`git switch -c release/v0.2 v0.2.0`).
+The release branch stays put across patches — `release/0.2.x` carries
+`v0.2.0`, `v0.2.1`, `v0.2.2`, ... If the branch was lost (e.g. accidentally
+deleted), recreate it from the most recent matching tag:
+`git switch -c release/0.2.x v0.2.2`.

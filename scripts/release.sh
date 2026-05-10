@@ -4,9 +4,11 @@
 # Enforces the trunk-based + release-branch workflow documented in
 # docs/BRANCHING.md:
 #
-#   - Stable versions (e.g. 0.2.0) MUST be cut from a `release/v*` branch.
+#   - Stable versions (e.g. 0.1.0, 0.1.1) MUST be cut from the matching
+#     `release/MAJOR.MINOR.x` branch — one branch per minor line that hosts
+#     every patch in that line.
 #   - Prereleases (e.g. 0.2.0-rc.1, 0.3.0-alpha.4) may be cut from `master`,
-#     a `release/v*`, or any `feature/*` branch.
+#     a `release/MAJOR.MINOR.x`, or any work branch (feature/*, fix/*, ...).
 #
 # Steps: branch check -> clean tree -> tag-doesn't-exist -> dotnet test ->
 # rewrite <Version> in Directory.Build.props -> commit -> annotated tag ->
@@ -17,7 +19,8 @@
 #
 # Examples:
 #   scripts/release.sh 0.3.0-alpha.1                # from master
-#   scripts/release.sh 0.2.0                        # from release/v0.2
+#   scripts/release.sh 0.1.0                        # from release/0.1.x
+#   scripts/release.sh 0.1.1                        # also from release/0.1.x
 #   scripts/release.sh 0.2.0 --remote upstream
 
 set -Eeuo pipefail
@@ -72,16 +75,25 @@ cd "$REPO_ROOT"
 
 step "Verifying current branch matches version policy"
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+# Extract MAJOR.MINOR from the requested version so we can match it against
+# the release branch name (release/MAJOR.MINOR.x).
+VERSION_MAJOR_MINOR="$(echo "$VERSION" | sed -E 's/^([0-9]+\.[0-9]+).*/\1/')"
+EXPECTED_RELEASE_BRANCH="release/${VERSION_MAJOR_MINOR}.x"
+
 if [[ "$IS_PRERELEASE" -eq 1 ]]; then
     case "$BRANCH" in
-        master|release/v*|feature/*|fix/*|perf/*|chore/*|ci/*|docs/*) ;;
+        master|release/*.x|feature/*|fix/*|perf/*|chore/*|ci/*|docs/*) ;;
         *)
-            echo "error: prerelease '$VERSION' must be cut from master, release/v*, or a work branch (feature/*, fix/*, perf/*, chore/*, ci/*, docs/*); current branch is '$BRANCH'." >&2
+            echo "error: prerelease '$VERSION' must be cut from master, release/MAJOR.MINOR.x, or a work branch (feature/*, fix/*, perf/*, chore/*, ci/*, docs/*); current branch is '$BRANCH'." >&2
             exit 1 ;;
     esac
 else
-    if [[ ! "$BRANCH" =~ ^release/v ]]; then
-        echo "error: stable version '$VERSION' must be cut from a 'release/v*' branch (got '$BRANCH'). See docs/BRANCHING.md." >&2
+    if [[ ! "$BRANCH" =~ ^release/[0-9]+\.[0-9]+\.x$ ]]; then
+        echo "error: stable version '$VERSION' must be cut from a 'release/MAJOR.MINOR.x' branch (got '$BRANCH'). See docs/BRANCHING.md." >&2
+        exit 1
+    fi
+    if [[ "$BRANCH" != "$EXPECTED_RELEASE_BRANCH" ]]; then
+        echo "error: stable version '$VERSION' belongs on '$EXPECTED_RELEASE_BRANCH'; current branch is '$BRANCH'." >&2
         exit 1
     fi
 fi
@@ -137,7 +149,7 @@ git push "$REMOTE" "$TAG"
 # Open a backmerge PR from the release branch into master. This is best-effort
 # — if `gh` is unavailable or the run is on master itself, print the manual
 # command and exit clean.
-if [[ "$OPEN_PR" -eq 1 && "$BRANCH" =~ ^release/v && "$BRANCH" != "master" ]]; then
+if [[ "$OPEN_PR" -eq 1 && "$BRANCH" =~ ^release/[0-9]+\.[0-9]+\.x$ ]]; then
     if command -v gh >/dev/null 2>&1; then
         step "Opening backmerge PR ($BRANCH -> master)"
         gh pr create \
