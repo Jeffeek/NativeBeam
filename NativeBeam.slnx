@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/NativeBeam.Demo/NativeBeam.Demo.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/NativeBeam.Pdf/NativeBeam.Pdf.csproj" />
+  </Folder>
+</Solution>

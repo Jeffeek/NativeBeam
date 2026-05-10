@@ -1,0 +1,30 @@
+<Project>
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-all</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- Strict AOT / trimming analyzers across the whole solution -->
+    <IsTrimmable>true</IsTrimmable>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+
+    <!-- Promote AOT/trim warnings to errors:
+         IL2026 RequiresUnreferencedCode reached
+         IL2104 Assembly produced trim warnings
+         IL3050 RequiresDynamicCode reached
+         IL3051 RequiresDynamicCode mismatch on override
+         IL3052 RequiresAssemblyFiles reached
+         IL3053 AOT analysis warning -->
+    <WarningsAsErrors>$(WarningsAsErrors);IL2026;IL2104;IL3050;IL3051;IL3052;IL3053</WarningsAsErrors>
+
+    <Authors>NativeBeam</Authors>
+    <Product>NativeBeam</Product>
+  </PropertyGroup>
+
+</Project>
