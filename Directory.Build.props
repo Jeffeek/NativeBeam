@@ -1,4 +1,4 @@
-<Project>
+﻿<Project>
 
   <PropertyGroup>
     <LangVersion>latest</LangVersion>
@@ -26,7 +26,7 @@
     <!-- Package metadata. The release scripts rewrite <Version> in place; the
          literal tag must stay on a single line so simple regex/sed updates
          continue to work. -->
-    <Version>0.1.0</Version>
+    <Version>0.1.0-rc1</Version>
     <!-- Generate XML docs alongside every assembly. CS1591 (missing XML on
          public member) is silenced globally; we still write docs on the
          user-facing surface (IPdfRenderer, AotPdfRenderer, PdfOptions). -->
