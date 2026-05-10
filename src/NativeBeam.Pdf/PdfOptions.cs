@@ -31,7 +31,11 @@ public readonly record struct PdfOptions(
     int NavigationTimeoutMs = 30_000,
     int LoadEventTimeoutMs = 30_000)
 {
-    public static PdfOptions Default => default;
+    // NOTE: For a record struct, `new()` and `default(T)` both zero-init —
+    // they do NOT apply the primary-ctor defaults. We must explicitly invoke
+    // the primary constructor so Scale=1.0 et al. take effect; otherwise
+    // Chrome rejects PDF rendering with "scale is outside of [0.1 - 2] range".
+    public static PdfOptions Default { get; } = new PdfOptions(Format: PdfPaperFormat.A4);
 
     internal (double Width, double Height) GetPaperSizeInches() => Format switch
     {

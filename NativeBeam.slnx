@@ -5,4 +5,7 @@
   <Folder Name="/src/">
     <Project Path="src/NativeBeam.Pdf/NativeBeam.Pdf.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/NativeBeam.Pdf.Tests/NativeBeam.Pdf.Tests.csproj" />
+  </Folder>
 </Solution>
