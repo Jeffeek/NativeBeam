@@ -18,8 +18,10 @@ internal sealed class CdpConnection : IAsyncDisposable
     private readonly ClientWebSocket _ws;
     private readonly CancellationTokenSource _cts = new();
     private readonly ConcurrentDictionary<int, TaskCompletionSource<JsonElement>> _pending = new();
+    private readonly ConcurrentDictionary<long, CdpEventSubscription> _subscriptions = new();
     private readonly Task _receiveLoop;
     private int _nextId;
+    private long _nextSubscriptionToken;
     private int _disposed;
 
     private CdpConnection(ClientWebSocket ws)
@@ -86,6 +88,26 @@ internal sealed class CdpConnection : IAsyncDisposable
     public async Task SendVoidAsync(string method, string? sessionId, CancellationToken cancellationToken)
     {
         _ = await SendCoreRawAsync<object>(method, paramsValue: null, paramsInfo: null, sessionId, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Registers a one-shot subscription for a CDP event. The returned
+    /// <see cref="CdpEventSubscription"/> resolves on the first matching
+    /// (method, sessionId) message; pass <c>null</c> for <paramref name="sessionId"/>
+    /// to match any session. The subscription must be registered <em>before</em>
+    /// the action that triggers the event to avoid races.
+    /// </summary>
+    public CdpEventSubscription SubscribeOnce(string method, string? sessionId)
+    {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+
+        var token = Interlocked.Increment(ref _nextSubscriptionToken);
+        var subscription = new CdpEventSubscription(
+            method,
+            sessionId,
+            _ => _subscriptions.TryRemove(token, out CdpEventSubscription? _));
+        _subscriptions[token] = subscription;
+        return subscription;
     }
 
     private async Task<TResult> SendCoreAsync<TParams, TResult>(
@@ -199,13 +221,18 @@ internal sealed class CdpConnection : IAsyncDisposable
     {
         using var doc = JsonDocument.Parse(stream);
         var root = doc.RootElement;
-        if (!root.TryGetProperty("id", out var idElement) || idElement.ValueKind != JsonValueKind.Number)
+
+        if (root.TryGetProperty("id", out var idElement) && idElement.ValueKind == JsonValueKind.Number)
         {
-            // CDP event without an id correlation — ignored in the minimal surface.
+            DispatchResponse(root, idElement.GetInt32());
             return;
         }
 
-        var id = idElement.GetInt32();
+        DispatchEvent(root);
+    }
+
+    private void DispatchResponse(JsonElement root, int id)
+    {
         if (!_pending.TryRemove(id, out var tcs))
         {
             return;
@@ -228,6 +255,51 @@ internal sealed class CdpConnection : IAsyncDisposable
         }
     }
 
+    private void DispatchEvent(JsonElement root)
+    {
+        if (!root.TryGetProperty("method", out var methodElement) || methodElement.ValueKind != JsonValueKind.String)
+        {
+            return;
+        }
+
+        var method = methodElement.GetString();
+        if (method is null)
+        {
+            return;
+        }
+
+        string? sessionId = null;
+        if (root.TryGetProperty("sessionId", out var sessionElement) && sessionElement.ValueKind == JsonValueKind.String)
+        {
+            sessionId = sessionElement.GetString();
+        }
+
+        JsonElement paramsClone = default;
+        var hasParams = root.TryGetProperty("params", out var paramsElement);
+        if (hasParams)
+        {
+            paramsClone = paramsElement.Clone();
+        }
+
+        foreach (var kvp in _subscriptions)
+        {
+            var sub = kvp.Value;
+            if (!string.Equals(sub.Method, method, StringComparison.Ordinal))
+            {
+                continue;
+            }
+            if (sub.SessionId is not null && !string.Equals(sub.SessionId, sessionId, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (_subscriptions.TryRemove(kvp.Key, out _))
+            {
+                sub.TryComplete(paramsClone);
+            }
+        }
+    }
+
     private void FailAllPending(Exception exception)
     {
         foreach (var kvp in _pending)
@@ -235,6 +307,12 @@ internal sealed class CdpConnection : IAsyncDisposable
             kvp.Value.TrySetException(exception);
         }
         _pending.Clear();
+
+        foreach (var kvp in _subscriptions)
+        {
+            kvp.Value.TryFail(exception);
+        }
+        _subscriptions.Clear();
     }
 
     public async ValueTask DisposeAsync()

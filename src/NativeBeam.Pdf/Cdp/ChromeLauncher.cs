@@ -111,12 +111,18 @@ public sealed class ChromeLauncher : IAsyncDisposable
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
+            var pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            var pfx86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+            var lad = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             return FirstExisting(
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Google", "Chrome", "Application", "chrome.exe"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Google", "Chrome", "Application", "chrome.exe"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Google", "Chrome", "Application", "chrome.exe"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Microsoft", "Edge", "Application", "msedge.exe"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Microsoft", "Edge", "Application", "msedge.exe"));
+                Path.Combine(pf, "Google", "Chrome", "Application", "chrome.exe"),
+                Path.Combine(pfx86, "Google", "Chrome", "Application", "chrome.exe"),
+                Path.Combine(lad, "Google", "Chrome", "Application", "chrome.exe"),
+                Path.Combine(pf, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"),
+                Path.Combine(pfx86, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"),
+                Path.Combine(lad, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"),
+                Path.Combine(pf, "Microsoft", "Edge", "Application", "msedge.exe"),
+                Path.Combine(pfx86, "Microsoft", "Edge", "Application", "msedge.exe"));
         }
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
@@ -124,6 +130,7 @@ public sealed class ChromeLauncher : IAsyncDisposable
             return FirstExisting(
                 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
                 "/Applications/Chromium.app/Contents/MacOS/Chromium",
+                "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
                 "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge");
         }
 
@@ -134,6 +141,9 @@ public sealed class ChromeLauncher : IAsyncDisposable
             "/usr/bin/chromium",
             "/usr/bin/chromium-browser",
             "/snap/bin/chromium",
+            "/usr/bin/brave-browser",
+            "/usr/bin/brave-browser-stable",
+            "/snap/bin/brave",
             "/usr/bin/microsoft-edge");
     }
 

@@ -35,6 +35,10 @@ internal sealed record FrameInfo(string Id);
 
 internal sealed record PagePrintToPdfResult(string Data);
 
+// --- Events --------------------------------------------------------------
+
+internal sealed record PageLoadEventFiredEvent(double Timestamp);
+
 // --- Error envelope ------------------------------------------------------
 
 internal sealed record CdpErrorPayload(int Code, string Message);

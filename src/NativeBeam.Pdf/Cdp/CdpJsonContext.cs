@@ -22,6 +22,7 @@ namespace NativeBeam.Pdf.Cdp;
 [JsonSerializable(typeof(FrameTreeNode))]
 [JsonSerializable(typeof(FrameInfo))]
 [JsonSerializable(typeof(PagePrintToPdfResult))]
+[JsonSerializable(typeof(PageLoadEventFiredEvent))]
 [JsonSerializable(typeof(CdpErrorPayload))]
 internal sealed partial class CdpJsonContext : JsonSerializerContext
 {

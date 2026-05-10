@@ -28,7 +28,8 @@ public readonly record struct PdfOptions(
     double MarginRight = 0.0,
     double MarginBottom = 0.0,
     double MarginLeft = 0.0,
-    int NavigationTimeoutMs = 30_000)
+    int NavigationTimeoutMs = 30_000,
+    int LoadEventTimeoutMs = 30_000)
 {
     public static PdfOptions Default => default;
 

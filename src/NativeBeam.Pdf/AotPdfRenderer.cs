@@ -1,3 +1,4 @@
+using System.Text.Json;
 using NativeBeam.Pdf.Cdp;
 
 namespace NativeBeam.Pdf;
@@ -68,7 +69,11 @@ public sealed class AotPdfRenderer : IPdfRenderer
                 sessionId,
                 cancellationToken).ConfigureAwait(false);
 
-            // 5. Inject the HTML payload directly into the main frame.
+            // 5. Subscribe to the load event BEFORE triggering navigation so the
+            //    waiter is registered even for very fast loads.
+            using var loadFired = conn.SubscribeOnce("Page.loadEventFired", sessionId);
+
+            // 6. Inject the HTML payload directly into the main frame.
             await conn.SendVoidAsync(
                 "Page.setDocumentContent",
                 new PageSetDocumentContentParams(frameTree.FrameTree.Frame.Id, html),
@@ -76,7 +81,21 @@ public sealed class AotPdfRenderer : IPdfRenderer
                 sessionId,
                 cancellationToken).ConfigureAwait(false);
 
-            // 6. Print to PDF.
+            // 7. Wait for the page (including external resources) to finish loading.
+            try
+            {
+                var loadPayload = await loadFired.Task
+                    .WaitAsync(TimeSpan.FromMilliseconds(options.LoadEventTimeoutMs), cancellationToken)
+                    .ConfigureAwait(false);
+                _ = loadPayload.Deserialize(CdpJsonContext.Default.PageLoadEventFiredEvent);
+            }
+            catch (TimeoutException ex)
+            {
+                throw new CdpException(
+                    $"Page.loadEventFired did not fire within {options.LoadEventTimeoutMs} ms.", ex);
+            }
+
+            // 8. Print to PDF.
             var (paperWidth, paperHeight) = options.GetPaperSizeInches();
             var pdf = await conn.SendAsync(
                 "Page.printToPDF",
