@@ -1,0 +1,105 @@
+name: Publish
+
+# Triggered when a release tag is pushed (e.g. v0.2.0). Tag creation is owned
+# by scripts/release.{sh,ps1} which also updates Directory.Build.props, so the
+# tagged commit already carries the correct <Version>. We additionally derive
+# the version from the tag itself and pass it via /p:Version to be defensive
+# against drift.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+
+jobs:
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version from tag
+        id: version
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Tag '$tag' does not match v<semver>." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $version"
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install Chromium
+        id: chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: stable
+
+      - name: Export CHROME_PATH
+        run: echo "CHROME_PATH=${{ steps.chrome.outputs.chrome-path }}" >> "$GITHUB_ENV"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release /p:Version=${{ steps.version.outputs.version }}
+
+      # Tests are mandatory on the release path. Do NOT add --skip flags here:
+      # if quality regresses, we want the tag push to fail loudly rather than
+      # ship a broken package.
+      - name: Test
+        run: dotnet test --no-build --configuration Release
+
+      # Gate: a Native AOT publish must succeed before we ship a package that
+      # advertises AOT compatibility. A trim/AOT regression here is a
+      # release-blocking failure.
+      - name: Validate Native AOT publish (linux-x64)
+        run: |
+          dotnet publish samples/NativeBeam.Demo/NativeBeam.Demo.csproj \
+            -c Release \
+            -r linux-x64 \
+            /p:PublishAot=true \
+            /p:Version=${{ steps.version.outputs.version }}
+
+      - name: Pack
+        run: |
+          dotnet pack src/NativeBeam.Pdf/NativeBeam.Pdf.csproj \
+            --no-build \
+            -c Release \
+            -o artifacts \
+            /p:Version=${{ steps.version.outputs.version }}
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg-${{ steps.version.outputs.version }}
+          path: artifacts/*.nupkg
+          if-no-files-found: error
+
+      - name: Push to NuGet.org
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [[ -z "$NUGET_API_KEY" ]]; then
+            echo "NUGET_API_KEY secret is not configured." >&2
+            exit 1
+          fi
+          dotnet nuget push 'artifacts/*.nupkg' \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
