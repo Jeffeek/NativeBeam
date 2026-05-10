@@ -9,6 +9,14 @@ on:
   push:
     tags:
       - 'v*'
+  # Manual lane: lets a maintainer rebuild a release artifact for inspection
+  # without re-tagging, optionally without publishing to NuGet.org.
+  workflow_dispatch:
+    inputs:
+      push_to_nuget:
+        description: 'Push the produced .nupkg to NuGet.org'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -91,13 +99,18 @@ jobs:
           path: artifacts/*.nupkg
           if-no-files-found: error
 
+      # Soft-skip the NuGet push so the GitHub Artifacts upload above is
+      # always reachable. Disablement comes from either the workflow_dispatch
+      # input or an unconfigured secret; the artifact remains available for
+      # manual `dotnet nuget push` against a private feed.
       - name: Push to NuGet.org
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.push_to_nuget }}
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
           if [[ -z "$NUGET_API_KEY" ]]; then
-            echo "NUGET_API_KEY secret is not configured." >&2
-            exit 1
+            echo "::warning::NUGET_API_KEY secret not configured; skipping push. Artifact 'nupkg-${{ steps.version.outputs.version }}' is available for manual upload."
+            exit 0
           fi
           dotnet nuget push 'artifacts/*.nupkg' \
             --api-key "$NUGET_API_KEY" \

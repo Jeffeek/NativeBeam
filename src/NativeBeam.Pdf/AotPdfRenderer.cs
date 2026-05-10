@@ -17,16 +17,46 @@ public sealed class AotPdfRenderer : IPdfRenderer
     private CdpConnection? _connection;
     private int _disposed;
 
+    /// <summary>
+    /// Creates a renderer that auto-detects a Chromium-based browser using
+    /// the platform-specific search paths defined in <see cref="ChromeLauncher"/>.
+    /// </summary>
     public AotPdfRenderer() : this(new ChromeLaunchOptions())
     {
     }
 
+    /// <summary>
+    /// Creates a renderer with explicit browser launch options.
+    /// </summary>
+    /// <param name="launchOptions">
+    /// Browser executable path, headless flag, and startup timeout. Pass an
+    /// instance with <see cref="ChromeLaunchOptions.ExecutablePath"/> set when
+    /// running in environments where the browser is not installed in a
+    /// well-known location (e.g. CI runners populating <c>CHROME_PATH</c>).
+    /// </param>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="launchOptions"/> is <see langword="null"/>.
+    /// </exception>
     public AotPdfRenderer(ChromeLaunchOptions launchOptions)
     {
         ArgumentNullException.ThrowIfNull(launchOptions);
         _launchOptions = launchOptions;
     }
 
+    /// <summary>
+    /// Renders an HTML document to a PDF byte buffer.
+    /// </summary>
+    /// <param name="html">A complete HTML document. See <see cref="IPdfRenderer.RenderHtmlAsync(string, PdfOptions, CancellationToken)"/>.</param>
+    /// <param name="options">Page geometry and timeouts; prefer <see cref="PdfOptions.Default"/>.</param>
+    /// <param name="cancellationToken">Cancels navigation and printing.</param>
+    /// <returns>The rendered PDF as a byte array (always begins with <c>%PDF-</c>).</returns>
+    /// <remarks>
+    /// On first call the renderer launches Chromium and opens a single
+    /// <see cref="System.Net.WebSockets.ClientWebSocket"/> to the browser's
+    /// debugger endpoint; subsequent calls reuse that connection. Each render
+    /// uses a fresh CDP target so concurrent calls do not interleave page
+    /// state.
+    /// </remarks>
     public async Task<byte[]> RenderHtmlAsync(
         string html,
         PdfOptions options,
@@ -180,6 +210,12 @@ public sealed class AotPdfRenderer : IPdfRenderer
         }
     }
 
+    /// <summary>
+    /// Closes the WebSocket session, terminates the headless browser, and
+    /// removes the temporary user-data directory. Subsequent
+    /// <see cref="RenderHtmlAsync(string, PdfOptions, CancellationToken)"/>
+    /// calls will throw <see cref="ObjectDisposedException"/>.
+    /// </summary>
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)

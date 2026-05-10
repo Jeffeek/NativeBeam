@@ -27,6 +27,18 @@
          literal tag must stay on a single line so simple regex/sed updates
          continue to work. -->
     <Version>0.1.0</Version>
+    <!-- Generate XML docs alongside every assembly. CS1591 (missing XML on
+         public member) is silenced globally; we still write docs on the
+         user-facing surface (IPdfRenderer, AotPdfRenderer, PdfOptions). -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <!-- NuGetAudit catches vulnerable direct & transitive deps at restore time.
+         `all` audits transitive too; `low` raises the floor below the default. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+
     <Authors>NativeBeam</Authors>
     <Product>NativeBeam</Product>
     <Company>NativeBeam</Company>
