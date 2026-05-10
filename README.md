@@ -61,6 +61,67 @@ await File.WriteAllBytesAsync("out.pdf", pdf);
 
 > **Important:** use `PdfOptions.Default`, not `default(PdfOptions)`. Record-struct primary-constructor defaults are not applied by `default(T)` or `new()` — the static `Default` invokes the primary constructor explicitly and is the only correct default.
 
+### Quick Start with Templates
+
+For dynamic content, generate the HTML from a template engine first and feed the result to `RenderHtmlAsync`. The shipped sample (`samples/NativeBeam.Sample.Scriban`) uses [Scriban](https://github.com/scriban/scriban) through its `ScriptObject` dictionary API — the only Scriban surface that does not reflect over CLR types and therefore stays AOT-clean:
+
+```csharp
+using NativeBeam.Pdf;
+using Scriban;
+using Scriban.Runtime;
+
+var template = Template.Parse("""
+    <h1>Invoice {{ invoice.number }}</h1>
+    <ul>
+    {{- for line in invoice.lines }}
+      <li>{{ line.description }} — {{ line.total }}</li>
+    {{- end }}
+    </ul>
+    """);
+
+var invoice = new ScriptObject
+{
+    ["number"] = "INV-2026-0042",
+    ["lines"] = new ScriptArray
+    {
+        new ScriptObject { ["description"] = "Engineering retainer", ["total"] = "6,000.00" },
+        new ScriptObject { ["description"] = "Toolchain license",     ["total"] = "297.00"   },
+    },
+};
+var ctx = new TemplateContext();
+ctx.PushGlobal(new ScriptObject { ["invoice"] = invoice });
+
+var html = await template.RenderAsync(ctx);
+
+await using var renderer = new AotPdfRenderer();
+var pdf = await renderer.RenderHtmlAsync(html, PdfOptions.Default);
+```
+
+> **AOT note:** avoid `Template.Render(myPoco)` — that overload reflects over the model's properties and breaks under `PublishAot`. Build a `ScriptObject` graph instead.
+
+### Running JavaScript before printing
+
+For dashboards, charts, or anything driven by JS, set `PreRenderScript` on `PdfOptions`. The script runs in the page after `Page.loadEventFired` and before `Page.printToPDF`, and may return a promise — NativeBeam awaits it:
+
+```csharp
+var options = PdfOptions.Default with
+{
+    PreRenderScript = """
+        await document.fonts.ready;
+        await window.myChart?.whenReady();
+    """,
+};
+
+var pdf = await renderer.RenderHtmlAsync(html, options);
+```
+
+For environment probes that don't need the rendered DOM, the standalone `EvaluateScriptAsync` runs against a transient `about:blank` target and returns a `JsonElement`:
+
+```csharp
+var ua = await renderer.EvaluateScriptAsync("navigator.userAgent");
+Console.WriteLine(ua.GetString());
+```
+
 ### Publishing as Native AOT
 
 ```bash
@@ -110,7 +171,7 @@ For an AOT-published binary, swap the runtime base for `mcr.microsoft.com/dotnet
 
 - **PDF/A** — emit ISO 19005-conformant output for archival use cases (currently emits standard PDF 1.4).
 - **Header / footer templates** — surface CDP's `headerTemplate`/`footerTemplate` parameters through `PdfOptions`, plus first-class support for page-number / total-pages tokens.
-- **JavaScript injection** — `Page.addScriptToEvaluateOnNewDocument` and a typed `EvaluateAsync<T>` for parameterised templates.
+- **JavaScript injection** — `Page.addScriptToEvaluateOnNewDocument` and a typed `EvaluateAsync<T>` for parameterised templates (basic `EvaluateScriptAsync` and `PdfOptions.PreRenderScript` already shipped).
 - **Multi-document pipeline** — render N HTML inputs through a single Chromium target pool with bounded concurrency.
 - **Event surface** — `Network.responseReceived`, `Page.frameNavigated`, etc., exposed alongside the existing one-shot `SubscribeOnce` API.
 

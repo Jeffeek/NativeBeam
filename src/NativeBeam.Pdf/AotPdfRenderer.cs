@@ -125,6 +125,16 @@ public sealed class AotPdfRenderer : IPdfRenderer
                     $"Page.loadEventFired did not fire within {options.LoadEventTimeoutMs} ms.", ex);
             }
 
+            // 7b. Optional pre-render hook. Use this to await chart libraries,
+            //     trigger fonts.ready, force layout, etc. The script runs in
+            //     the rendered DOM and may return a promise; we always set
+            //     awaitPromise=true so async work is observed.
+            if (!string.IsNullOrEmpty(options.PreRenderScript))
+            {
+                await EvaluateOnSessionAsync(conn, sessionId, options.PreRenderScript, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
             // 8. Print to PDF.
             var (paperWidth, paperHeight) = options.GetPaperSizeInches();
             var pdf = await conn.SendAsync(
@@ -208,6 +218,84 @@ public sealed class AotPdfRenderer : IPdfRenderer
         {
             _initLock.Release();
         }
+    }
+
+    /// <summary>
+    /// Evaluates a JavaScript expression against a transient <c>about:blank</c>
+    /// target. Useful for environment probes; for DOM-bound scripts use
+    /// <see cref="PdfOptions.PreRenderScript"/> instead.
+    /// </summary>
+    /// <inheritdoc cref="IPdfRenderer.EvaluateScriptAsync(string, CancellationToken)"/>
+    public async Task<JsonElement> EvaluateScriptAsync(
+        string script,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(script);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+
+        var conn = await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
+
+        var created = await conn.SendAsync(
+            "Target.createTarget",
+            new TargetCreateTargetParams("about:blank"),
+            CdpJsonContext.Default.TargetCreateTargetParams,
+            CdpJsonContext.Default.TargetCreateTargetResult,
+            sessionId: null,
+            cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var attached = await conn.SendAsync(
+                "Target.attachToTarget",
+                new TargetAttachToTargetParams(created.TargetId, Flatten: true),
+                CdpJsonContext.Default.TargetAttachToTargetParams,
+                CdpJsonContext.Default.TargetAttachToTargetResult,
+                sessionId: null,
+                cancellationToken).ConfigureAwait(false);
+
+            return await EvaluateOnSessionAsync(conn, attached.SessionId, script, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            try
+            {
+                await conn.SendVoidAsync(
+                    "Target.closeTarget",
+                    new TargetCloseTargetParams(created.TargetId),
+                    CdpJsonContext.Default.TargetCloseTargetParams,
+                    sessionId: null,
+                    CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (CdpException)
+            {
+            }
+        }
+    }
+
+    private static async Task<JsonElement> EvaluateOnSessionAsync(
+        CdpConnection conn,
+        string sessionId,
+        string script,
+        CancellationToken cancellationToken)
+    {
+        var result = await conn.SendAsync(
+            "Runtime.evaluate",
+            new RuntimeEvaluateParams(script, ReturnByValue: true, AwaitPromise: true),
+            CdpJsonContext.Default.RuntimeEvaluateParams,
+            CdpJsonContext.Default.RuntimeEvaluateResult,
+            sessionId,
+            cancellationToken).ConfigureAwait(false);
+
+        if (result.ExceptionDetails is not null)
+        {
+            var ex = result.ExceptionDetails;
+            var description = ex.Exception?.Description ?? ex.Text;
+            throw new CdpException(
+                $"Script evaluation threw at line {ex.LineNumber}, column {ex.ColumnNumber}: {description}");
+        }
+
+        return result.Result.Value;
     }
 
     /// <summary>

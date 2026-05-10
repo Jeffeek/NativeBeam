@@ -29,7 +29,8 @@ public readonly record struct PdfOptions(
     double MarginBottom = 0.0,
     double MarginLeft = 0.0,
     int NavigationTimeoutMs = 30_000,
-    int LoadEventTimeoutMs = 30_000)
+    int LoadEventTimeoutMs = 30_000,
+    string? PreRenderScript = null)
 {
     // NOTE: For a record struct, `new()` and `default(T)` both zero-init —
     // they do NOT apply the primary-ctor defaults. We must explicitly invoke

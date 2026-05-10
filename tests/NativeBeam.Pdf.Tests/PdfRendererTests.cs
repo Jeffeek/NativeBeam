@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 
 namespace NativeBeam.Pdf.Tests;
 
@@ -69,6 +70,47 @@ public sealed class PdfRendererTests(BrowserFixture fixture) : IClassFixture<Bro
         await File.WriteAllBytesAsync(path, pdf);
 
         Assert.True(File.Exists(path), $"Expected PDF artifact at {path}.");
+    }
+
+    [SkippableFact]
+    public async Task EvaluateScriptAsync_ReturnsJsonValue()
+    {
+        Skip.IfNot(fixture.IsAvailable, fixture.UnavailableReason);
+
+        var sum = await fixture.Renderer!.EvaluateScriptAsync("40 + 2");
+        Assert.Equal(JsonValueKind.Number, sum.ValueKind);
+        Assert.Equal(42, sum.GetInt32());
+
+        var awaited = await fixture.Renderer.EvaluateScriptAsync(
+            "Promise.resolve({ ok: true, name: 'beam' })");
+        Assert.Equal(JsonValueKind.Object, awaited.ValueKind);
+        Assert.True(awaited.GetProperty("ok").GetBoolean());
+        Assert.Equal("beam", awaited.GetProperty("name").GetString());
+    }
+
+    [SkippableFact]
+    public async Task RenderHtml_PreRenderScript_MutatesDom()
+    {
+        Skip.IfNot(fixture.IsAvailable, fixture.UnavailableReason);
+
+        const string html = """
+            <!doctype html>
+            <html>
+              <body>
+                <h1 id="t">PLACEHOLDER</h1>
+              </body>
+            </html>
+            """;
+
+        var options = PdfOptions.Default with
+        {
+            PreRenderScript = "document.getElementById('t').textContent = 'rewritten';",
+        };
+
+        var pdf = await fixture.Renderer!.RenderHtmlAsync(html, options);
+
+        Assert.NotNull(pdf);
+        AssertPdfMagic(pdf);
     }
 
     private static void AssertPdfMagic(byte[] pdf)

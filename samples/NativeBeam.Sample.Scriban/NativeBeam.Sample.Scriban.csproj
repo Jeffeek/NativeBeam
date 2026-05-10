@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <RootNamespace>NativeBeam.Demo.Templating</RootNamespace>
+    <RootNamespace>NativeBeam.Sample.Scriban</RootNamespace>
     <!-- Scriban itself is reflection-heavy when binding arbitrary CLR objects.
          This sample uses the ScriptObject (dictionary) binding path, which is
          the only Scriban surface that's safe to call from AOT code. We do not

@@ -58,4 +58,37 @@ public interface IPdfRenderer : IAsyncDisposable
         string html,
         PdfOptions options,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Evaluates a JavaScript expression in a transient <c>about:blank</c> page
+    /// and returns the result as a JSON value.
+    /// </summary>
+    /// <param name="script">
+    /// A JavaScript expression. The CDP boundary always passes
+    /// <c>returnByValue: true</c> and <c>awaitPromise: true</c>, so promises
+    /// are unwrapped and the value is JSON-serializable.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the evaluation.</param>
+    /// <returns>
+    /// A <see cref="System.Text.Json.JsonElement"/> with the evaluated value.
+    /// For scripts that don't return a JSON-serializable value, the element
+    /// will have <see cref="System.Text.Json.JsonValueKind.Undefined"/>.
+    /// </returns>
+    /// <remarks>
+    /// This method is intended for environment probes and self-contained
+    /// computations. To execute scripts against the rendered DOM (e.g. to
+    /// finalise a chart library before printing), set
+    /// <see cref="PdfOptions.PreRenderScript"/> on the options passed to
+    /// <see cref="RenderHtmlAsync(string, PdfOptions, CancellationToken)"/>;
+    /// that script runs in the same target after <c>Page.loadEventFired</c>
+    /// and before <c>Page.printToPDF</c>.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="script"/> is null.</exception>
+    /// <exception cref="ObjectDisposedException">The renderer has been disposed.</exception>
+    /// <exception cref="Cdp.CdpException">
+    /// The script threw, or the CDP session reported an error.
+    /// </exception>
+    Task<System.Text.Json.JsonElement> EvaluateScriptAsync(
+        string script,
+        CancellationToken cancellationToken = default);
 }

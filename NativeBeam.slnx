@@ -1,7 +1,15 @@
 <Solution>
   <Folder Name="/samples/">
-    <Project Path="samples/NativeBeam.Demo.Templating/NativeBeam.Demo.Templating.csproj" />
     <Project Path="samples/NativeBeam.Demo/NativeBeam.Demo.csproj" />
+    <Project Path="samples/NativeBeam.Sample.Scriban/NativeBeam.Sample.Scriban.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+    <File Path="CONTRIBUTING.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="LICENSE" />
+    <File Path="NativeBeam.sln.DotSettings.user" />
+    <File Path="README.md" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/NativeBeam.Pdf/NativeBeam.Pdf.csproj" />

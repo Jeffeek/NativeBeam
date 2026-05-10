@@ -35,6 +35,32 @@ internal sealed record FrameInfo(string Id);
 
 internal sealed record PagePrintToPdfResult(string Data);
 
+// --- Runtime.evaluate ----------------------------------------------------
+
+internal sealed record RuntimeEvaluateParams(
+    string Expression,
+    bool ReturnByValue = true,
+    bool AwaitPromise = true,
+    bool UserGesture = false);
+
+internal sealed record RuntimeEvaluateResult(
+    CdpRemoteObject Result,
+    CdpExceptionDetails? ExceptionDetails);
+
+internal sealed record CdpRemoteObject(
+    string Type,
+    string? Subtype = null,
+    string? ClassName = null,
+    System.Text.Json.JsonElement Value = default,
+    string? Description = null);
+
+internal sealed record CdpExceptionDetails(
+    int ExceptionId,
+    string Text,
+    int LineNumber,
+    int ColumnNumber,
+    CdpRemoteObject? Exception = null);
+
 // --- Events --------------------------------------------------------------
 
 internal sealed record PageLoadEventFiredEvent(double Timestamp);
