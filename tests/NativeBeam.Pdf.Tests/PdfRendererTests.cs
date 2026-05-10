@@ -1,9 +1,8 @@
 using System.Text;
-using NativeBeam.Pdf;
 
 namespace NativeBeam.Pdf.Tests;
 
-public sealed class PdfRendererTests : IClassFixture<BrowserFixture>
+public sealed class PdfRendererTests(BrowserFixture fixture) : IClassFixture<BrowserFixture>
 {
     // 1x1 transparent PNG.
     private const string PngDataUrl =
@@ -13,19 +12,12 @@ public sealed class PdfRendererTests : IClassFixture<BrowserFixture>
     private const string CssDataUrl =
         "data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kOiNmMGYwZjA7Zm9udC1mYW1pbHk6c2Fucy1zZXJpZjttYXJnaW46MjRweH1oMXtjb2xvcjojMzMzfQ==";
 
-    private static readonly byte[] PdfMagic = [(byte)'%', (byte)'P', (byte)'D', (byte)'F', (byte)'-'];
-
-    private readonly BrowserFixture _fixture;
-
-    public PdfRendererTests(BrowserFixture fixture)
-    {
-        _fixture = fixture;
-    }
+    private static readonly byte[] PdfMagic = "%PDF-"u8.ToArray();
 
     [SkippableFact]
     public async Task Render_SimpleHtml_ReturnsPdfBytes()
     {
-        Skip.IfNot(_fixture.IsAvailable, _fixture.UnavailableReason);
+        Skip.IfNot(fixture.IsAvailable, fixture.UnavailableReason);
 
         const string html = """
             <!doctype html>
@@ -35,7 +27,7 @@ public sealed class PdfRendererTests : IClassFixture<BrowserFixture>
             </html>
             """;
 
-        var pdf = await _fixture.Renderer!.RenderHtmlAsync(html, PdfOptions.Default);
+        var pdf = await fixture.Renderer!.RenderHtmlAsync(html, PdfOptions.Default);
 
         Assert.NotNull(pdf);
         Assert.True(pdf.Length > PdfMagic.Length, $"PDF was unexpectedly small: {pdf.Length} bytes.");
@@ -45,7 +37,7 @@ public sealed class PdfRendererTests : IClassFixture<BrowserFixture>
     [SkippableFact]
     public async Task Render_WithExternalResources_Success()
     {
-        Skip.IfNot(_fixture.IsAvailable, _fixture.UnavailableReason);
+        Skip.IfNot(fixture.IsAvailable, fixture.UnavailableReason);
 
         var html = $$"""
             <!doctype html>
@@ -63,7 +55,7 @@ public sealed class PdfRendererTests : IClassFixture<BrowserFixture>
             </html>
             """;
 
-        var pdf = await _fixture.Renderer!.RenderHtmlAsync(html, PdfOptions.Default);
+        var pdf = await fixture.Renderer!.RenderHtmlAsync(html, PdfOptions.Default);
 
         Assert.NotNull(pdf);
         Assert.True(pdf.Length > 256, $"PDF was unexpectedly small: {pdf.Length} bytes.");

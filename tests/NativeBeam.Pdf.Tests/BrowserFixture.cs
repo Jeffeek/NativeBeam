@@ -1,4 +1,3 @@
-using NativeBeam.Pdf;
 using NativeBeam.Pdf.Cdp;
 
 namespace NativeBeam.Pdf.Tests;

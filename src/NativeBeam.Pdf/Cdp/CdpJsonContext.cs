@@ -1,11 +1,12 @@
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace NativeBeam.Pdf.Cdp;
 
 /// <summary>
 /// Source-generated System.Text.Json context covering every CDP DTO used by
 /// NativeBeam. No reflection-based serialization is performed at runtime;
-/// every type listed here gets a compile-time <see cref="JsonTypeInfo"/>.
+/// every type listed here gets a compile-time <see cref="JsonTypeInfo{T}"/>.
 /// </summary>
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -24,6 +25,4 @@ namespace NativeBeam.Pdf.Cdp;
 [JsonSerializable(typeof(PagePrintToPdfResult))]
 [JsonSerializable(typeof(PageLoadEventFiredEvent))]
 [JsonSerializable(typeof(CdpErrorPayload))]
-internal sealed partial class CdpJsonContext : JsonSerializerContext
-{
-}
+internal sealed partial class CdpJsonContext : JsonSerializerContext;
