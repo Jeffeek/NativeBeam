@@ -116,6 +116,78 @@ public sealed class PdfRendererTests(BrowserFixture fixture, ITestOutputHelper o
     }
 
     [SkippableFact]
+    public async Task Render_Concurrent_MultipleRequests()
+    {
+        Skip.IfNot(fixture.IsAvailable, fixture.UnavailableReason);
+
+        // Five distinct documents fired in parallel against the SAME renderer
+        // instance. The CDP connection is one socket guarded by a single
+        // read-pump; this verifies the id-keyed dispatch dictionary and the
+        // per-render fresh-target pattern do not deadlock or interleave.
+        const int parallelism = 5;
+        var tasks = new Task<byte[]>[parallelism];
+        for (var i = 0; i < parallelism; i++)
+        {
+            var idx = i;
+            tasks[i] = Task.Run(() =>
+                fixture.Renderer!.RenderHtmlAsync(
+                    $"<!doctype html><html><body><h1>render #{idx}</h1></body></html>",
+                    PdfOptions.Default));
+        }
+
+        var sw = Stopwatch.StartNew();
+        var results = await Task.WhenAll(tasks);
+        sw.Stop();
+
+        output.WriteLine(
+            $"{parallelism} concurrent renders completed in {sw.ElapsedMilliseconds:N0} ms.");
+
+        Assert.All(results, pdf =>
+        {
+            Assert.NotNull(pdf);
+            Assert.True(pdf.Length > PdfMagic.Length);
+            AssertPdfMagic(pdf);
+        });
+    }
+
+    [Theory]
+    [InlineData(PdfPaperFormat.A4, 8.27, 11.69)]
+    [InlineData(PdfPaperFormat.A3, 11.69, 16.54)]
+    [InlineData(PdfPaperFormat.Letter, 8.5, 11.0)]
+    [InlineData(PdfPaperFormat.Legal, 8.5, 14.0)]
+    [InlineData(PdfPaperFormat.Tabloid, 11.0, 17.0)]
+    public void PdfOptions_PaperFormat_MapsToCdpInches(PdfPaperFormat format, double expectedWidth, double expectedHeight)
+    {
+        // Validates the CDP boundary: Page.printToPDF expects paperWidth /
+        // paperHeight in inches, not a format string. A regression here would
+        // ship the wrong page size to Chromium.
+        var options = PdfOptions.Default with { Format = format };
+        var (width, height) = options.GetPaperSizeInches();
+
+        Assert.Equal(expectedWidth, width, precision: 2);
+        Assert.Equal(expectedHeight, height, precision: 2);
+    }
+
+    [Fact]
+    public void PdfOptions_Default_ProducesNonZeroScale()
+    {
+        // Regression guard: `default(PdfOptions)` zero-inits the record struct
+        // (Scale = 0) which Chromium rejects. PdfOptions.Default explicitly
+        // invokes the primary constructor and must yield Scale = 1.0.
+        var options = PdfOptions.Default;
+        Assert.Equal(1.0, options.Scale);
+        Assert.Equal(PdfPaperFormat.A4, options.Format);
+        Assert.Equal(PdfOrientation.Portrait, options.Orientation);
+        Assert.True(options.PrintBackground);
+        Assert.Equal(0.0, options.MarginTop);
+        Assert.Equal(0.0, options.MarginRight);
+        Assert.Equal(0.0, options.MarginBottom);
+        Assert.Equal(0.0, options.MarginLeft);
+        Assert.Equal(30_000, options.NavigationTimeoutMs);
+        Assert.Equal(30_000, options.LoadEventTimeoutMs);
+    }
+
+    [SkippableFact]
     public async Task Render_LargeHtml_PerformanceCheck()
     {
         Skip.IfNot(fixture.IsAvailable, fixture.UnavailableReason);
