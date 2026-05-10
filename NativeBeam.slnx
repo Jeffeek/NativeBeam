@@ -4,12 +4,23 @@
     <Project Path="samples/NativeBeam.Sample.Scriban/NativeBeam.Sample.Scriban.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
+    <File Path=".github/dependabot.yml" />
     <File Path=".gitignore" />
     <File Path="CONTRIBUTING.md" />
     <File Path="Directory.Build.props" />
     <File Path="LICENSE" />
     <File Path="NativeBeam.sln.DotSettings.user" />
     <File Path="README.md" />
+  </Folder>
+  <Folder Name="/Solution Items/github/">
+    <File Path=".github/dependabot.yml" />
+  </Folder>
+  <Folder Name="/Solution Items/github/workflows/">
+    <File Path=".github/workflows/ci.yml" />
+    <File Path=".github/workflows/codeql.yml" />
+    <File Path=".github/workflows/dependency-review.yml" />
+    <File Path=".github/workflows/nuget-activity-monitor.yml" />
+    <File Path=".github/workflows/publish.yml" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/NativeBeam.Pdf/NativeBeam.Pdf.csproj" />

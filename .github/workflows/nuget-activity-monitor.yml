@@ -1,0 +1,84 @@
+name: NuGet Activity Monitor
+
+# Monthly health check for the published package. Pulls the v3 registration
+# index from NuGet.org and prints a summary (versions, latest publish date,
+# listed-vs-unlisted counts) into the workflow run. Cheap, no auth needed.
+#
+# This is a passive monitor — it does not modify anything. If the package is
+# not yet published the job exits cleanly with a notice.
+on:
+  schedule:
+    - cron: '0 8 1 * *'   # 08:00 UTC, 1st of each month
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package id to inspect'
+        required: false
+        default: 'NativeBeam.Pdf'
+
+permissions:
+  contents: read
+
+jobs:
+  monitor:
+    name: nuget-activity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve package id
+        id: pkg
+        run: |
+          name="${{ github.event.inputs.package }}"
+          name="${name:-NativeBeam.Pdf}"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - name: Query NuGet v3 registration index
+        env:
+          PKG: ${{ steps.pkg.outputs.name }}
+        run: |
+          set -euo pipefail
+
+          lower="$(echo "$PKG" | tr '[:upper:]' '[:lower:]')"
+          url="https://api.nuget.org/v3/registration5-gz-semver2/${lower}/index.json"
+
+          echo "Fetching $url"
+          status="$(curl -sS -o response.json.gz -w '%{http_code}' --compressed "$url" || true)"
+
+          if [[ "$status" == "404" ]]; then
+            echo "::notice title=NuGet monitor::Package '$PKG' is not published yet (HTTP 404)."
+            exit 0
+          fi
+          if [[ "$status" != "200" ]]; then
+            echo "::error title=NuGet monitor::Unexpected HTTP $status from NuGet.org."
+            exit 1
+          fi
+
+          # response is gzipped; jq handles plain JSON, so decompress first.
+          gunzip -t response.json.gz 2>/dev/null && gunzip -c response.json.gz > response.json || mv response.json.gz response.json
+
+          # Summarise.
+          total="$(jq '[.items[].items[]] | length' response.json)"
+          listed="$(jq '[.items[].items[] | select(.catalogEntry.listed == true)] | length' response.json)"
+          unlisted=$((total - listed))
+          latest_version="$(jq -r '[.items[].items[] | .catalogEntry] | sort_by(.published) | .[-1].version' response.json)"
+          latest_published="$(jq -r '[.items[].items[] | .catalogEntry] | sort_by(.published) | .[-1].published' response.json)"
+
+          {
+            echo "## NuGet activity for \`$PKG\`"
+            echo ""
+            echo "| Metric | Value |"
+            echo "|---|---|"
+            echo "| Total versions | $total |"
+            echo "| Listed | $listed |"
+            echo "| Unlisted | $unlisted |"
+            echo "| Latest version | $latest_version |"
+            echo "| Latest published | $latest_published |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Warn if no release in 180 days — useful for spotting a stalled package.
+          if [[ -n "$latest_published" && "$latest_published" != "null" ]]; then
+            cutoff="$(date -u -d '180 days ago' +%s)"
+            published="$(date -u -d "$latest_published" +%s)"
+            if (( published < cutoff )); then
+              echo "::warning title=NuGet monitor::No release of '$PKG' in the last 180 days (latest: $latest_version on $latest_published)."
+            fi
+          fi

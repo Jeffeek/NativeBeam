@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using Xunit.Abstractions;
 
 namespace NativeBeam.Pdf.Tests;
 
-public sealed class PdfRendererTests(BrowserFixture fixture) : IClassFixture<BrowserFixture>
+public sealed class PdfRendererTests(BrowserFixture fixture, ITestOutputHelper output) : IClassFixture<BrowserFixture>
 {
     // 1x1 transparent PNG.
     private const string PngDataUrl =
@@ -111,6 +113,75 @@ public sealed class PdfRendererTests(BrowserFixture fixture) : IClassFixture<Bro
 
         Assert.NotNull(pdf);
         AssertPdfMagic(pdf);
+    }
+
+    [SkippableFact]
+    public async Task Render_LargeHtml_PerformanceCheck()
+    {
+        Skip.IfNot(fixture.IsAvailable, fixture.UnavailableReason);
+
+        // Generous upper bound to keep the test reliable on shared CI runners.
+        // The intent is to catch a clear regression (10x slower than the
+        // current ~1-3s baseline), not to gate on absolute timing.
+        const int budgetMs = 60_000;
+        const int targetPages = 50;
+
+        var html = BuildLargeHtml(targetPages);
+
+        var sw = Stopwatch.StartNew();
+        var pdf = await fixture.Renderer!.RenderHtmlAsync(html, PdfOptions.Default);
+        sw.Stop();
+
+        var bytesPerPage = pdf.Length / Math.Max(1, targetPages);
+        output.WriteLine(
+            $"Rendered ~{targetPages} pages ({pdf.Length:N0} bytes, ~{bytesPerPage:N0} B/page) in {sw.ElapsedMilliseconds:N0} ms.");
+
+        Assert.NotNull(pdf);
+        AssertPdfMagic(pdf);
+        Assert.True(
+            sw.ElapsedMilliseconds < budgetMs,
+            $"Render exceeded the {budgetMs} ms budget (took {sw.ElapsedMilliseconds} ms). Investigate before merging.");
+    }
+
+    private static string BuildLargeHtml(int pageCount)
+    {
+        var sb = new StringBuilder(64 * 1024);
+        sb.Append("""
+            <!doctype html>
+            <html>
+              <head>
+                <meta charset="utf-8">
+                <title>perf</title>
+                <style>
+                  body { font-family: sans-serif; margin: 0; }
+                  .page { page-break-after: always; padding: 32px; }
+                  h2 { border-bottom: 1px solid #aaa; padding-bottom: 4px; }
+                  table { width: 100%; border-collapse: collapse; }
+                  td, th { padding: 4px 8px; border: 1px solid #ddd; font-size: 11px; }
+                </style>
+              </head>
+              <body>
+            """);
+
+        for (var i = 1; i <= pageCount; i++)
+        {
+            sb.Append("<section class=\"page\">");
+            sb.Append("<h2>Page ").Append(i).Append("</h2>");
+            sb.Append("<p>Synthetic content used to establish a rendering baseline.</p>");
+            sb.Append("<table><thead><tr><th>#</th><th>Lorem</th><th>Ipsum</th><th>Sum</th></tr></thead><tbody>");
+            for (var row = 0; row < 30; row++)
+            {
+                sb.Append("<tr><td>").Append(row + 1)
+                  .Append("</td><td>Lorem ipsum dolor sit amet</td>")
+                  .Append("<td>consectetur adipiscing elit</td>")
+                  .Append("<td>").Append(row * (i + 1)).Append("</td></tr>");
+            }
+            sb.Append("</tbody></table>");
+            sb.Append("</section>");
+        }
+
+        sb.Append("</body></html>");
+        return sb.ToString();
     }
 
     private static void AssertPdfMagic(byte[] pdf)
