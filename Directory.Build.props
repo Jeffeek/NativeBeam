@@ -23,8 +23,26 @@
          IL3053 AOT analysis warning -->
     <WarningsAsErrors>$(WarningsAsErrors);IL2026;IL2104;IL3050;IL3051;IL3052;IL3053</WarningsAsErrors>
 
+    <!-- Package metadata. The release scripts rewrite <Version> in place; the
+         literal tag must stay on a single line so simple regex/sed updates
+         continue to work. -->
+    <Version>0.1.0</Version>
     <Authors>NativeBeam</Authors>
     <Product>NativeBeam</Product>
+    <Company>NativeBeam</Company>
+    <Copyright>Copyright (c) NativeBeam contributors</Copyright>
+    <PackageId>$(MSBuildProjectName)</PackageId>
+    <Description>Native AOT-compatible HTML-to-PDF engine using Chromium via the DevTools Protocol.</Description>
+    <PackageProjectUrl>https://github.com/NativeBeam/NativeBeam</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/NativeBeam/NativeBeam.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>pdf;html;chromium;cdp;aot;native-aot</PackageTags>
+    <PackageReadmeFile Condition="Exists('$(MSBuildThisFileDirectory)README.md')">README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)README.md')">
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="" Visible="false" />
+  </ItemGroup>
 
 </Project>
