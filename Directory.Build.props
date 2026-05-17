@@ -1,4 +1,4 @@
-﻿<Project>
+<Project>
 
   <PropertyGroup>
     <LangVersion>latest</LangVersion>
@@ -23,9 +23,8 @@
          IL3053 AOT analysis warning -->
     <WarningsAsErrors>$(WarningsAsErrors);IL2026;IL2104;IL3050;IL3051;IL3052;IL3053</WarningsAsErrors>
 
-    <!-- Package metadata. The release scripts rewrite <Version> in place; the
-         literal tag must stay on a single line so simple regex/sed updates
-         continue to work. -->
+    <!-- Version is rewritten in place by scripts/release.{sh,ps1};
+         keep the tag on a single line so the regex/sed substitution works. -->
     <Version>0.1.0-rc1</Version>
     <!-- Generate XML docs alongside every assembly. CS1591 (missing XML on
          public member) is silenced globally; we still write docs on the
@@ -39,6 +38,17 @@
     <NuGetAuditMode>all</NuGetAuditMode>
     <NuGetAuditLevel>low</NuGetAuditLevel>
 
+    <!-- Reproducible builds: byte-for-byte identical output regardless of
+         machine or timestamp. CI sets GITHUB_ACTIONS=true automatically. -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <!-- Package metadata applied only to packable projects (not tests or samples). -->
+  <PropertyGroup Condition="'$(IsPackable)' != 'false'">
     <Authors>NativeBeam</Authors>
     <Product>NativeBeam</Product>
     <Company>NativeBeam</Company>
@@ -53,7 +63,7 @@
     <PackageReadmeFile Condition="Exists('$(MSBuildThisFileDirectory)README.md')">README.md</PackageReadmeFile>
   </PropertyGroup>
 
-  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)README.md')">
+  <ItemGroup Condition="'$(IsPackable)' != 'false' And Exists('$(MSBuildThisFileDirectory)README.md')">
     <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="" Visible="false" />
   </ItemGroup>
 
