@@ -1,16 +1,9 @@
 name: Publish
 
-# Triggered when a release tag is pushed (e.g. v0.2.0). Tag creation is owned
-# by scripts/release.{sh,ps1} which also updates Directory.Build.props, so the
-# tagged commit already carries the correct <Version>. We additionally derive
-# the version from the tag itself and pass it via /p:Version to be defensive
-# against drift.
 on:
   push:
     tags:
       - 'v*'
-  # Manual lane: lets a maintainer rebuild a release artifact for inspection
-  # without re-tagging, optionally without publishing to NuGet.org.
   workflow_dispatch:
     inputs:
       push_to_nuget:
@@ -21,6 +14,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   DOTNET_NOLOGO: 'true'
   DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
@@ -30,10 +27,21 @@ jobs:
   publish:
     name: publish
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
 
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
+        with:
+          egress-policy: audit
+
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Resolve version from tag
         id: version
@@ -48,9 +56,23 @@ jobs:
           echo "Resolved version: $version"
 
       - name: Set up .NET 10
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
         with:
           dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore NativeBeam.slnx
+
+      - name: Build
+        run: dotnet build NativeBeam.slnx --no-restore -c Release /p:Version=${{ steps.version.outputs.version }}
 
       - name: Install Chromium
         id: chrome
@@ -61,21 +83,9 @@ jobs:
       - name: Export CHROME_PATH
         run: echo "CHROME_PATH=${{ steps.chrome.outputs.chrome-path }}" >> "$GITHUB_ENV"
 
-      - name: Restore
-        run: dotnet restore
-
-      - name: Build
-        run: dotnet build --no-restore --configuration Release /p:Version=${{ steps.version.outputs.version }}
-
-      # Tests are mandatory on the release path. Do NOT add --skip flags here:
-      # if quality regresses, we want the tag push to fail loudly rather than
-      # ship a broken package.
       - name: Test
-        run: dotnet test --no-build --configuration Release
+        run: dotnet test NativeBeam.slnx --no-build -c Release
 
-      # Gate: a Native AOT publish must succeed before we ship a package that
-      # advertises AOT compatibility. A trim/AOT regression here is a
-      # release-blocking failure.
       - name: Validate Native AOT publish (linux-x64)
         run: |
           dotnet publish samples/NativeBeam.Demo/NativeBeam.Demo.csproj \
@@ -86,23 +96,35 @@ jobs:
 
       - name: Pack
         run: |
+          # PACK_COMMANDS_START
           dotnet pack src/NativeBeam.Pdf/NativeBeam.Pdf.csproj \
             --no-build \
             -c Release \
             -o artifacts \
             /p:Version=${{ steps.version.outputs.version }}
+          # PACK_COMMANDS_END
+
+      - name: List artifacts
+        run: ls -la ./artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        with:
+          files: ./artifacts/*.nupkg
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload package artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nupkg-${{ steps.version.outputs.version }}
           path: artifacts/*.nupkg
           if-no-files-found: error
+          retention-days: 30
 
-      # Soft-skip the NuGet push so the GitHub Artifacts upload above is
-      # always reachable. Disablement comes from either the workflow_dispatch
-      # input or an unconfigured secret; the artifact remains available for
-      # manual `dotnet nuget push` against a private feed.
       - name: Push to NuGet.org
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.push_to_nuget }}
         env:

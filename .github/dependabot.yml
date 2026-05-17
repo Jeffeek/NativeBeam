@@ -1,44 +1,69 @@
 version: 2
 updates:
-  # NuGet package updates for the library, samples, and tests.
   - package-ecosystem: "nuget"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
-      time: "06:00"
-      timezone: "Etc/UTC"
+      time: "09:00"
+      timezone: "UTC"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "nuget"
     commit-message:
-      prefix: "chore"
+      prefix: "deps"
       include: "scope"
     groups:
+      patch-updates:
+        patterns: ["*"]
+        update-types: [patch]
       microsoft:
-        patterns:
-          - "Microsoft.*"
-          - "System.*"
+        patterns: ["Microsoft.*", "System.*"]
+        update-types: [minor, patch]
       xunit:
-        patterns:
-          - "xunit*"
-          - "Xunit.*"
+        patterns: ["xunit*", "Xunit.*"]
       coverage:
-        patterns:
-          - "coverlet.*"
+        patterns: ["coverlet.*"]
+    allow:
+      - dependency-type: "all"
 
-  # GitHub Actions kept current — same cadence so PR review batches align.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
-      time: "06:00"
-      timezone: "Etc/UTC"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
     labels:
       - "dependencies"
       - "github-actions"
     commit-message:
       prefix: "ci"
       include: "scope"
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # PACKAGE_DIRECTORIES_START
+  - package-ecosystem: nuget
+    directory: /src/NativeBeam.Pdf
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: nuget
+    directory: /tests/NativeBeam.Pdf.Tests
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: nuget
+    directory: /samples/NativeBeam.Demo
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: nuget
+    directory: /samples/NativeBeam.Sample.Scriban
+    schedule:
+      interval: weekly
+  # PACKAGE_DIRECTORIES_END
