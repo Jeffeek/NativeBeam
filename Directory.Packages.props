@@ -22,7 +22,7 @@
     <PackageVersion Include="Xunit.SkippableFact" Version="1.5.61" />
 
     <!-- Samples -->
-    <PackageVersion Include="Scriban" Version="7.2.1" />
+    <PackageVersion Include="Scriban" Version="7.2.3" />
   </ItemGroup>
 
 </Project>
