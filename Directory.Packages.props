@@ -7,12 +7,12 @@
 
   <ItemGroup>
     <!-- Library: NativeBeam.Pdf -->
-    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.10" />
     <PackageVersion Include="System.ComponentModel.Annotations" Version="5.0.0" />
-    <PackageVersion Include="System.IO.Pipelines" Version="10.0.9" />
+    <PackageVersion Include="System.IO.Pipelines" Version="10.0.10" />
     <PackageVersion Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" />
-    <PackageVersion Include="System.Text.Encodings.Web" Version="10.0.9" />
-    <PackageVersion Include="System.Text.Json" Version="10.0.9" />
+    <PackageVersion Include="System.Text.Encodings.Web" Version="10.0.10" />
+    <PackageVersion Include="System.Text.Json" Version="10.0.10" />
 
     <!-- Tests: NativeBeam.Pdf.Tests -->
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
