@@ -22,7 +22,7 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
 
     <!-- Samples -->
-    <PackageVersion Include="Scriban" Version="7.2.6" />
+    <PackageVersion Include="Scriban" Version="7.4.0" />
   </ItemGroup>
 
 </Project>
