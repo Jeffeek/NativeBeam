@@ -7,22 +7,22 @@
 
   <ItemGroup>
     <!-- Library: NativeBeam.Pdf -->
-    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.14" />
     <PackageVersion Include="System.ComponentModel.Annotations" Version="5.0.0" />
-    <PackageVersion Include="System.IO.Pipelines" Version="10.0.12" />
+    <PackageVersion Include="System.IO.Pipelines" Version="10.0.14" />
     <PackageVersion Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" />
-    <PackageVersion Include="System.Text.Encodings.Web" Version="10.0.12" />
-    <PackageVersion Include="System.Text.Json" Version="10.0.12" />
+    <PackageVersion Include="System.Text.Encodings.Web" Version="10.0.14" />
+    <PackageVersion Include="System.Text.Json" Version="10.0.14" />
 
     <!-- Tests: NativeBeam.Pdf.Tests -->
     <PackageVersion Include="coverlet.collector" Version="10.1.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="Xunit.SkippableFact" Version="1.5.85" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
 
     <!-- Samples -->
-    <PackageVersion Include="Scriban" Version="7.5.0" />
+    <PackageVersion Include="Scriban" Version="7.5.3" />
   </ItemGroup>
 
 </Project>
