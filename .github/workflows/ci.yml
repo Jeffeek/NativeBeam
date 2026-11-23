@@ -89,23 +89,21 @@ jobs:
 
       - name: Run tests with coverage
         run: >-
-          dotnet test NativeBeam.slnx -c Release --no-build
-          --collect:"XPlat Code Coverage"
-          --results-directory ./coverage
+          dotnet test --solution NativeBeam.slnx -c Release --no-build --verbosity normal --coverage --coverage-output-format cobertura
         timeout-minutes: 12
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-reports
-          path: ./coverage
+          path: TestResults/**/*.cobertura.xml
           retention-days: 7
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          directory: ./coverage
+          directory: TestResults/**/*.cobertura.xml
           flags: ubuntu-latest
           fail_ci_if_error: false
           verbose: true

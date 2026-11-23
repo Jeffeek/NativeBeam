@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
-using Xunit.Abstractions;
 
 namespace NativeBeam.Pdf.Tests;
 
@@ -17,10 +16,10 @@ public sealed class PdfRendererTests(BrowserFixture fixture, ITestOutputHelper o
 
     private static readonly byte[] PdfMagic = "%PDF-"u8.ToArray();
 
-    [SkippableFact]
+    [Fact]
     public async Task Render_SimpleHtml_ReturnsPdfBytes()
     {
-        Skip.IfNot(fixture.IsAvailable, fixture.UnavailableReason);
+        Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? "Browser unavailable");
 
         const string html = """
             <!doctype html>
@@ -30,17 +29,17 @@ public sealed class PdfRendererTests(BrowserFixture fixture, ITestOutputHelper o
             </html>
             """;
 
-        var pdf = await fixture.Renderer!.RenderHtmlAsync(html, PdfOptions.Default);
+        var pdf = await fixture.Renderer!.RenderHtmlAsync(html, PdfOptions.Default, TestContext.Current.CancellationToken);
 
         Assert.NotNull(pdf);
         Assert.True(pdf.Length > PdfMagic.Length, $"PDF was unexpectedly small: {pdf.Length} bytes.");
         AssertPdfMagic(pdf);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Render_WithExternalResources_Success()
     {
-        Skip.IfNot(fixture.IsAvailable, fixture.UnavailableReason);
+        Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? "Browser unavailable");
 
         var html = $$"""
             <!doctype html>
@@ -58,7 +57,7 @@ public sealed class PdfRendererTests(BrowserFixture fixture, ITestOutputHelper o
             </html>
             """;
 
-        var pdf = await fixture.Renderer!.RenderHtmlAsync(html, PdfOptions.Default);
+        var pdf = await fixture.Renderer!.RenderHtmlAsync(html, PdfOptions.Default, TestContext.Current.CancellationToken);
 
         Assert.NotNull(pdf);
         Assert.True(pdf.Length > 256, $"PDF was unexpectedly small: {pdf.Length} bytes.");
@@ -69,31 +68,31 @@ public sealed class PdfRendererTests(BrowserFixture fixture, ITestOutputHelper o
         var dir = Path.Combine(Path.GetTempPath(), "nativebeam-tests");
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, $"external-{Guid.NewGuid():N}.pdf");
-        await File.WriteAllBytesAsync(path, pdf);
+        await File.WriteAllBytesAsync(path, pdf, TestContext.Current.CancellationToken);
 
         Assert.True(File.Exists(path), $"Expected PDF artifact at {path}.");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task EvaluateScriptAsync_ReturnsJsonValue()
     {
-        Skip.IfNot(fixture.IsAvailable, fixture.UnavailableReason);
+        Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? "Browser unavailable");
 
-        var sum = await fixture.Renderer!.EvaluateScriptAsync("40 + 2");
+        var sum = await fixture.Renderer!.EvaluateScriptAsync("40 + 2", TestContext.Current.CancellationToken);
         Assert.Equal(JsonValueKind.Number, sum.ValueKind);
         Assert.Equal(42, sum.GetInt32());
 
         var awaited = await fixture.Renderer.EvaluateScriptAsync(
-            "Promise.resolve({ ok: true, name: 'beam' })");
+            "Promise.resolve({ ok: true, name: 'beam' })", TestContext.Current.CancellationToken);
         Assert.Equal(JsonValueKind.Object, awaited.ValueKind);
         Assert.True(awaited.GetProperty("ok").GetBoolean());
         Assert.Equal("beam", awaited.GetProperty("name").GetString());
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task RenderHtml_PreRenderScript_MutatesDom()
     {
-        Skip.IfNot(fixture.IsAvailable, fixture.UnavailableReason);
+        Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? "Browser unavailable");
 
         const string html = """
             <!doctype html>
@@ -109,22 +108,23 @@ public sealed class PdfRendererTests(BrowserFixture fixture, ITestOutputHelper o
             PreRenderScript = "document.getElementById('t').textContent = 'rewritten';",
         };
 
-        var pdf = await fixture.Renderer!.RenderHtmlAsync(html, options);
+        var pdf = await fixture.Renderer!.RenderHtmlAsync(html, options, TestContext.Current.CancellationToken);
 
         Assert.NotNull(pdf);
         AssertPdfMagic(pdf);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Render_Concurrent_MultipleRequests()
     {
-        Skip.IfNot(fixture.IsAvailable, fixture.UnavailableReason);
+        Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? "Browser unavailable");
 
         // Five distinct documents fired in parallel against the SAME renderer
         // instance. The CDP connection is one socket guarded by a single
         // read-pump; this verifies the id-keyed dispatch dictionary and the
         // per-render fresh-target pattern do not deadlock or interleave.
         const int parallelism = 5;
+        var token = TestContext.Current.CancellationToken;
         var tasks = new Task<byte[]>[parallelism];
         for (var i = 0; i < parallelism; i++)
         {
@@ -132,7 +132,8 @@ public sealed class PdfRendererTests(BrowserFixture fixture, ITestOutputHelper o
             tasks[i] = Task.Run(() =>
                 fixture.Renderer!.RenderHtmlAsync(
                     $"<!doctype html><html><body><h1>render #{idx}</h1></body></html>",
-                    PdfOptions.Default));
+                    PdfOptions.Default,
+                    token));
         }
 
         var sw = Stopwatch.StartNew();
@@ -187,10 +188,10 @@ public sealed class PdfRendererTests(BrowserFixture fixture, ITestOutputHelper o
         Assert.Equal(30_000, options.LoadEventTimeoutMs);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Render_LargeHtml_PerformanceCheck()
     {
-        Skip.IfNot(fixture.IsAvailable, fixture.UnavailableReason);
+        Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? "Browser unavailable");
 
         // Generous upper bound to keep the test reliable on shared CI runners.
         // The intent is to catch a clear regression (10x slower than the
@@ -201,7 +202,7 @@ public sealed class PdfRendererTests(BrowserFixture fixture, ITestOutputHelper o
         var html = BuildLargeHtml(targetPages);
 
         var sw = Stopwatch.StartNew();
-        var pdf = await fixture.Renderer!.RenderHtmlAsync(html, PdfOptions.Default);
+        var pdf = await fixture.Renderer!.RenderHtmlAsync(html, PdfOptions.Default, TestContext.Current.CancellationToken);
         sw.Stop();
 
         var bytesPerPage = pdf.Length / Math.Max(1, targetPages);
