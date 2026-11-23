@@ -6,7 +6,8 @@ namespace NativeBeam.Pdf.Cdp;
 public sealed record ChromeLaunchOptions(
     string? ExecutablePath = null,
     bool Headless = true,
-    TimeSpan? StartupTimeout = null);
+    TimeSpan? StartupTimeout = null,
+    bool NoSandbox = false);
 
 /// <summary>
 /// Cross-platform headless Chromium process manager. Starts Chrome with a
@@ -49,6 +50,10 @@ public sealed class ChromeLauncher : IAsyncDisposable
         };
         psi.ArgumentList.Add(options.Headless ? "--headless=new" : "--headless=old");
         psi.ArgumentList.Add("--disable-gpu");
+        if (options.NoSandbox)
+        {
+            psi.ArgumentList.Add("--no-sandbox");
+        }
         psi.ArgumentList.Add("--no-first-run");
         psi.ArgumentList.Add("--no-default-browser-check");
         psi.ArgumentList.Add("--disable-extensions");

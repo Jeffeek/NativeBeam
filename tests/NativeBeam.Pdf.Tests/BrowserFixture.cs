@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using NativeBeam.Pdf.Cdp;
 
 namespace NativeBeam.Pdf.Tests;
@@ -30,7 +31,13 @@ public sealed class BrowserFixture : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        var options = new ChromeLaunchOptions(ExecutablePath: ChromePathFromEnvironment);
+        // Chrome's setuid/namespace sandbox is unavailable on Linux CI runners
+        // (GitHub Actions), where it aborts with SIGABRT before reporting the
+        // debugger URL. Disable it there; keep it on for local/dev runs.
+        var noSandbox = IsRunningInGitHubActions && RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+        var options = new ChromeLaunchOptions(
+            ExecutablePath: ChromePathFromEnvironment,
+            NoSandbox: noSandbox);
         var renderer = new AotPdfRenderer(options);
         try
         {
