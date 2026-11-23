@@ -9,7 +9,7 @@
     <!-- Library: NativeBeam.Pdf -->
     <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="11.0.0" />
     <PackageVersion Include="System.ComponentModel.Annotations" Version="5.0.0" />
-    <PackageVersion Include="System.IO.Pipelines" Version="10.0.15" />
+    <PackageVersion Include="System.IO.Pipelines" Version="11.0.0" />
     <PackageVersion Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" />
     <PackageVersion Include="System.Text.Encodings.Web" Version="11.0.0" />
     <PackageVersion Include="System.Text.Json" Version="10.0.15" />
