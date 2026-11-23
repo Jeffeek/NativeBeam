@@ -86,7 +86,7 @@ jobs:
         run: echo "CHROME_PATH=${{ steps.chrome.outputs.chrome-path }}" >> "$GITHUB_ENV"
 
       - name: Test
-        run: dotnet test NativeBeam.slnx --no-build -c Release
+        run: dotnet test --solution NativeBeam.slnx -c Release --no-build --verbosity normal
 
       - name: Validate Native AOT publish (linux-x64)
         run: |
