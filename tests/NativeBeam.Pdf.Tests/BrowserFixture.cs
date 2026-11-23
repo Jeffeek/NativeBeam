@@ -28,7 +28,7 @@ public sealed class BrowserFixture : IAsyncLifetime
     public string? ChromePathFromEnvironment { get; }
         = NormalizePath(Environment.GetEnvironmentVariable("CHROME_PATH"));
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var options = new ChromeLaunchOptions(ExecutablePath: ChromePathFromEnvironment);
         var renderer = new AotPdfRenderer(options);
@@ -49,7 +49,7 @@ public sealed class BrowserFixture : IAsyncLifetime
         }
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (Renderer is not null)
         {

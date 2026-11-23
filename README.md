@@ -21,7 +21,7 @@ NativeBeam exists because every existing .NET browser-automation stack assumes a
 | Single-file publish | ✅ | Partial | Partial |
 | Cold start | Process launch + WS connect | Driver bootstrap + browser | Browser launch |
 
-The library targets `net8.0` and `net10.0`, ships zero unmanaged dependencies, and does not pull in a JavaScript runtime.
+The library targets `net11.0` and `net10.0`, ships zero unmanaged dependencies, and does not pull in a JavaScript runtime.
 
 ## The Pivot
 
